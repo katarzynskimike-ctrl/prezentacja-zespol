@@ -175,8 +175,14 @@
   .strip-d{background:rgba(201,169,97,.12);border-left:4px solid var(--gold);padding:14px 20px;font-size:16px;color:#E8EDF5;}
   .strip-d b{color:#fff;} .strip-d b.g{color:var(--green);}
 
+  /* progresywne odsłanianie (klik = kolejny punkt) */
+  .frag{opacity:0;transform:translateY(10px);transition:opacity .4s ease, transform .4s ease;}
+  .frag.on{opacity:1;transform:none;}
+  @media (prefers-reduced-motion: reduce){ .frag{transition:none;} }
+
   @media print{
     html,body{overflow:visible;background:#fff;}
+    .frag{opacity:1 !important;transform:none !important;}
     #nav,#hint,#notes{display:none !important;}
     #deck{position:static;}
     .slide{position:relative !important;display:block !important;top:auto;left:auto;transform:none !important;width:100%;height:auto;aspect-ratio:16/9;box-shadow:none;page-break-after:always;animation:none;}
@@ -439,22 +445,41 @@
     var s = Math.min(window.innerWidth/1280, window.innerHeight/720);
     document.documentElement.style.setProperty('--s', s);
   }
-  function show(k){
+  // Progresywne odsłanianie: każde kliknięcie odsłania kolejny punkt, potem następny slajd
+  var FRAG_SEL = '.it,.card,.stat-col,.caption,.ks,.chart,.pac-funnel,.pac,.strip,.strip-d,.badge,.plan,.trip,.thanks';
+  slides.forEach(function(sl){
+    sl.querySelectorAll(FRAG_SEL).forEach(function(el){ el.classList.add('frag'); });
+  });
+  function frags(sl){ return Array.prototype.slice.call(sl.querySelectorAll('.frag')); }
+  var fi = 0;
+  function renderFrags(){
+    frags(slides[i]).forEach(function(el,idx){ el.classList.toggle('on', idx < fi); });
+  }
+  function show(k, showAll){
     i = (k+n)%n;
     slides.forEach(function(sl,idx){ sl.classList.toggle('active', idx===i); });
     ctr.textContent = pad(i+1)+' / '+pad(n);
     if(NOTES[i]){ nlab.textContent = 'Notatki prelegenta · '+NOTES[i].who; ntext.innerHTML = NOTES[i].t; }
+    fi = showAll ? frags(slides[i]).length : 0;
+    renderFrags();
   }
-  function next(){ show(i+1); }
-  function prev(){ show(i-1); }
+  function next(){
+    if(fi < frags(slides[i]).length){ fi++; renderFrags(); }
+    else { show(i+1); }
+  }
+  function prev(){
+    if(fi > 0){ fi--; renderFrags(); }
+    else { show(i-1, true); }
+  }
 
-  document.getElementById('next').onclick = next;
-  document.getElementById('prev').onclick = prev;
+  document.getElementById('next').onclick = function(e){ e.stopPropagation(); next(); };
+  document.getElementById('prev').onclick = function(e){ e.stopPropagation(); prev(); };
+  document.getElementById('deck').addEventListener('click', function(){ next(); });
   document.addEventListener('keydown', function(e){
     if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){ e.preventDefault(); next(); }
     else if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); prev(); }
     else if(e.key==='Home'){ show(0); }
-    else if(e.key==='End'){ show(n-1); }
+    else if(e.key==='End'){ show(n-1, true); }
     else if(e.key==='n'||e.key==='N'){ notes.classList.toggle('show'); }
     else if(e.key==='f'||e.key==='F'){ if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}else{document.exitFullscreen&&document.exitFullscreen();} }
   });
